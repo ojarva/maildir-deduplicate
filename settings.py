@@ -1,0 +1,1 @@
+FOLDERS=['/storage/gmail/*']
