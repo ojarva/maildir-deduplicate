@@ -1,1 +1,1 @@
-FOLDERS=['/storage/gmail/*']
+FOLDERS = ['/storage/gmail/*']

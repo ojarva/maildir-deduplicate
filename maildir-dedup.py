@@ -21,7 +21,7 @@ class MaildirDedup:
         self.logger = logging.getLogger('maildirdedup - %s' % self.folder)
         self.logger.setLevel("INFO")
         if kwargs.get("syslog", True):
-            handler = logging.handlers.SysLogHandler(address = '/dev/log')
+            handler = logging.handlers.SysLogHandler(address='/dev/log')
         else:
             handler = logging.StreamHandler()
 
@@ -46,7 +46,7 @@ class MaildirDedup:
         return (folder, digest)
 
     @staticmethod
-    def dedupfile(filename, dedupfolder, stats = None, last_timestamp = 0):
+    def dedupfile(filename, dedupfolder, stats=None, last_timestamp=0):
         if stats is None:
             stats = {}
         file_stat = os.stat(filename)
@@ -75,7 +75,7 @@ class MaildirDedup:
         folder = self.folder
 
         if not os.path.exists("%s/maildir" % folder):
-            self.logger.error("No such directory: %s", folder+"/maildir")
+            self.logger.error("No such directory: %s", folder + "/maildir")
             return
         dedupfolder = "%s/dedup" % folder
         stats = {"new": 0, "dedup": 0, "already": 0, "mtime_skipped": 0}
@@ -94,16 +94,15 @@ class MaildirDedup:
                 self.logger.debug("Skipping %s: no modifications since %s", afolder, last_timestamp)
                 return
 
-            for afile in glob.glob("%s/*" % afolder): # "imap folder / {cur,new,tmp} / file"
+            for afile in glob.glob("%s/*" % afolder):  # "imap folder / {cur,new,tmp} / file"
                 MaildirDedup.dedupfile(afile, dedupfolder, stats, last_timestamp)
-
 
         # Only process cur/new folders under maildirs. tmp is messages still being processed / not completed.
         # There's a risk files under tmp are still being modified.
-        for afolder in glob.glob("%s/maildir/*/cur" % folder): # "imap folder / cur"
+        for afolder in glob.glob("%s/maildir/*/cur" % folder):  # "imap folder / cur"
             process_folder(afolder)
 
-        for afolder in glob.glob("%s/maildir/*/new" % folder): # "imap folder / new"
+        for afolder in glob.glob("%s/maildir/*/new" % folder):  # "imap folder / new"
             process_folder(afolder)
 
         last_timestamp = time.time()
@@ -113,14 +112,16 @@ class MaildirDedup:
         self.logger.info("Finished. %s files deduplicated.", stats["dedup"])
         return stats
 
+
 def usage():
-    print """
+    print("""
 usage: %s <maildir folder> [<more folders>]
 
 or create settings.py file with
 
 'FOLDERS=[...]'
-""" % sys.argv[0]
+""" % sys.argv[0])
+
 
 def main(folders):
     if len(folders) == 0:
@@ -134,10 +135,11 @@ def main(folders):
             stats = maildirdedup.run()
             if stats:
                 for key in stats:
-                    if not key in stats_all:
+                    if key not in stats_all:
                         stats_all[key] = 0
                     stats_all[key] += stats[key]
     return 0
+
 
 def get_folders():
     # If folders given as command line arguments, use those. If not, try settings.py.
