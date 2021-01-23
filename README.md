@@ -30,7 +30,7 @@ Assumes `maildir` subfolder and creates `dedup` folder for storing hard links us
               \- cur
               ...
               ...
-          \- dedup - automatically created by maildir-dedup.py
+          \- dedup - automatically created by maildir_dedup.py
 
 
 Deduplication process goes as follows:

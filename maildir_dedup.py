@@ -18,31 +18,34 @@ class MaildirDedup:
     def __init__(self, folder, **kwargs):
         self.folder = folder
 
-        self.logger = logging.getLogger('maildirdedup - %s' % self.folder)
+        self.logger = logging.getLogger(f"maildirdedup - {self.folder}")
         self.logger.setLevel("INFO")
         if kwargs.get("syslog", True):
             handler = logging.handlers.SysLogHandler(address='/dev/log')
         else:
             handler = logging.StreamHandler()
 
-        formatter = logging.Formatter('%(name)s - %(levelname)s - %(message)s')
+        formatter = logging.Formatter("%(name)s - %(levelname)s - %(message)s")
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
         self.stats = {}
         self.finished = False
         if not os.path.exists(self.folder):
             self.logger.error("No such folder")
-            raise IOError("No such folder: %s" % self.folder)
+            raise IOError(f"No such folder: {self.folder}")
 
     @staticmethod
     def calchash(filename):
-        """ Calculates content hash without consuming too much memory """
-        afile = open(filename)
+        """Calculate file hash memory-efficiently"""
         ahash = hashlib.sha512()
-        for data in afile:
-            ahash.update(data)
+        with open(filename) as afile:
+            while True:
+                data = afile.read(8192)
+                if not data:
+                    break
+                ahash.update(data)
         digest = ahash.hexdigest()
-        folder = "%s/%s/%s" % (digest[0], digest[1], digest[2])
+        folder = f"{digest[0]}/{digest[1]}/{digest[2]}"
         return (folder, digest)
 
     @staticmethod
@@ -54,9 +57,9 @@ class MaildirDedup:
             stats["mtime_skipped"] += 1
             return
         dedupf, ahash = MaildirDedup.calchash(filename)
-        dedupfile = "%s/%s/%s" % (dedupfolder, dedupf, ahash)
+        dedupfile = f"{dedupfolder}/{dedupf}/{ahash}"
         try:
-            os.makedirs("%s/%s" % (dedupfolder, dedupf))
+            os.makedirs(f"{dedupfolder}/{dedupf}")
         except OSError:
             pass
         if os.path.exists(dedupfile):
@@ -74,17 +77,18 @@ class MaildirDedup:
         self.logger.info("Starting")
         folder = self.folder
 
-        if not os.path.exists("%s/maildir" % folder):
-            self.logger.error("No such directory: %s", folder + "/maildir")
+        if not os.path.exists(f"{folder}/maildir"):
+            self.logger.error("No such directory: %s/maildir", folder)
             return
-        dedupfolder = "%s/dedup" % folder
+        dedupfolder = f"{folder}/dedup"
         stats = {"new": 0, "dedup": 0, "already": 0, "mtime_skipped": 0}
 
         if not os.path.exists(dedupfolder):
             os.mkdir(dedupfolder)
 
         try:
-            last_timestamp = float(open("%s/last_timestamp" % dedupfolder).read()) - 3600
+            with open(f"{dedupfolder}/last_timestamp") as timestamp_file:
+                last_timestamp = float(timestamp_file.read()) - 3600
         except (IOError, EOFError):
             last_timestamp = 0
 
@@ -94,19 +98,20 @@ class MaildirDedup:
                 self.logger.debug("Skipping %s: no modifications since %s", afolder, last_timestamp)
                 return
 
-            for afile in glob.glob("%s/*" % afolder):  # "imap folder / {cur,new,tmp} / file"
+            for afile in glob.glob(f"{afolder}/*"):  # "imap folder / {cur,new,tmp} / file"
                 MaildirDedup.dedupfile(afile, dedupfolder, stats, last_timestamp)
 
         # Only process cur/new folders under maildirs. tmp is messages still being processed / not completed.
         # There's a risk files under tmp are still being modified.
-        for afolder in glob.glob("%s/maildir/*/cur" % folder):  # "imap folder / cur"
+        for afolder in glob.glob(f"{folder}/maildir/*/cur"):  # "imap folder / cur"
             process_folder(afolder)
 
-        for afolder in glob.glob("%s/maildir/*/new" % folder):  # "imap folder / new"
+        for afolder in glob.glob(f"{folder}/maildir/*/new"):  # "imap folder / new"
             process_folder(afolder)
 
         last_timestamp = time.time()
-        open("%s/last_timestamp" % dedupfolder, "w").write(str(last_timestamp))
+        with open(f"{dedupfolder}/last_timestamp", "w") as outfile:
+            outfile.write(str(last_timestamp))
         self.stats = stats
         self.finished = True
         self.logger.info("Finished. %s files deduplicated.", stats["dedup"])
@@ -126,12 +131,12 @@ or create settings.py file with
 def main(folders):
     if len(folders) == 0:
         usage()
-        sys.exit(1)
+        return 1
 
     stats_all = {}
-    for afolder in folders:
-        for folder in glob.glob(afolder):
-            maildirdedup = MaildirDedup(folder)
+    for main_folder in folders:
+        for subfolder in glob.glob(main_folder):
+            maildirdedup = MaildirDedup(subfolder)
             stats = maildirdedup.run()
             if stats:
                 for key in stats:
